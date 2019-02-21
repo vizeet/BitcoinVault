@@ -6,7 +6,7 @@ from utility_adapters import leveldb_utils
 from functools import reduce
 from utility_adapters import hash_utils
 import ecdsa
-from __init__ import g_nettype, g_mnemonic_code, g_source_info, g_change_info, g_target_info, g_transaction_fees, g_locktime
+from __init__ import g_nettype, g_mnemonic_code, g_source_info, g_target_info, g_transaction_fees, g_locktime, g_in_use_access_keys, g_used_access_keys
 from utility_adapters import script_utils
 from utility_adapters import block_utils
 from utils.opcode_declarations import *
@@ -16,7 +16,7 @@ my_salt = ''
 
 N = (1 << 256) - 0x14551231950B75FC4402DA1732FC9BEBF
 
-def get_p2wpkh_address(access_key: str):
+def get_p2sh_p2wpkh_address(access_key: str):
         global g_nettype, g_mnemonic_code
         print('mnemonic code = %s' % g_mnemonic_code)
         seed_b = hd_wallet.generateSeedFromStr(g_mnemonic_code, "mnemonic" + my_salt)
@@ -26,10 +26,12 @@ def get_p2wpkh_address(access_key: str):
         address_s = pubkey_address.pubkey2segwitaddr(pubkey_b, g_nettype)
         h_b = pubkey_address.address2hash(address_s)
         h_s = bytes.decode(binascii.hexlify(h_b))
-        #print('hash160 of address = %s' % bytes.decode(binascii.hexlify(h_b)))
+        script_b = b'\x00\x14' + h_b
+        address_s = pubkey_address.redeemScript2address(script_b, g_nettype)
+        print('P2SH-P2WPKH Address = %s, script = %s' % (address_s, bytes.decode(binascii.hexlify(script_b))))
         return privkey_wif, pubkey_s, h_s, address_s
 
-def get_p2sh_p2wpkh_address(access_key: str):
+def get_p2sh_p2wsh_address(access_key: str):
         global g_nettype, g_mnemonic_code
         print('mnemonic code = %s' % g_mnemonic_code)
         seed_b = hd_wallet.generateSeedFromStr(g_mnemonic_code, "mnemonic" + my_salt)
@@ -48,27 +50,27 @@ def get_p2sh_witness_redeem_script(hash160_s: str, size: int):
         script_s = "00%x%s" % (size, hash160_s)
         return script_s
 
-def get_redeem_script_from_pubkey_list(pubkey_list: list, unlock_key_threshold: int):
+def get_redeem_script_from_pubkey_list(pubkey_list: list, unlock_key_count: int):
         print('pubkey list = %s' % pubkey_list)
-        encoded_opcode = script_utils.encodeOpN(unlock_key_threshold)
-        print('encoded opcode = %x for int = %d' % (encoded_opcode, unlock_key_threshold))
+        encoded_opcode = script_utils.encodeOpN(unlock_key_count)
+        print('encoded opcode = %x for int = %d' % (encoded_opcode, unlock_key_count))
         redeem_script_b = bytes([encoded_opcode]) + reduce(lambda x, y: x + y, [bytes([len(binascii.unhexlify(pubkey))]) + binascii.unhexlify(pubkey) for pubkey in pubkey_list]) + bytes([script_utils.encodeOpN(len(pubkey_list)), OP_CHECKMULTISIG])
         print('redeem_script = %s' % bytes.decode(binascii.hexlify(redeem_script_b)))
         return redeem_script_b
 
-def get_p2sh_address_from_pubkey_list(pubkey_list: list, unlock_key_threshold: int):
-        redeem_script_b = get_redeem_script_from_pubkey_list(pubkey_list, unlock_key_threshold)
+def get_p2sh_address_from_pubkey_list(pubkey_list: list, unlock_key_count: int):
+        redeem_script_b = get_redeem_script_from_pubkey_list(pubkey_list, unlock_key_count)
         address = pubkey_address.redeemScript2address(redeem_script_b, g_nettype)
         return address
 
-def get_p2wsh_address_from_pubkey_list(pubkey_list: list, unlock_key_threshold: int):
-        redeem_script_b = get_redeem_script_from_pubkey_list(pubkey_list, unlock_key_threshold)
+def get_p2wsh_address_from_pubkey_list(pubkey_list: list, unlock_key_count: int):
+        redeem_script_b = get_redeem_script_from_pubkey_list(pubkey_list, unlock_key_count)
         witprog = hash_utils.sha256(redeem_script_b)
         address = pubkey_address.hash2segwitaddr(witprog, g_nettype)
         return address
 
-def get_p2sh_p2wsh_address_from_pubkey_list(pubkey_list: list, unlock_key_threshold: int):
-        redeem_script_b = get_redeem_script_from_pubkey_list(pubkey_list, unlock_key_threshold)
+def get_p2sh_p2wsh_address_from_pubkey_list(pubkey_list: list, unlock_key_count: int):
+        redeem_script_b = get_redeem_script_from_pubkey_list(pubkey_list, unlock_key_count)
         witprog = hash_utils.sha256(redeem_script_b)
         p2sh_redeem_script_b = b'\x00' + bytes([len(witprog)]) + witprog
         address = pubkey_address.redeemScript2address(p2sh_redeem_script_b, g_nettype)
@@ -103,20 +105,6 @@ def get_p2wsh_keymaplist(access_key_list: str):
                 h_s = bytes.decode(binascii.hexlify(h_b))
                 keylist.append({'privkey': privkey_wif, 'pubkey': pubkey_s, 'hash160': h_s, 'addess': address_s})
         return keylist
-
-def get_p2pkh_address(access_key: str):
-        global g_nettype, g_mnemonic_code
-        print('mnemonic code = %s' % g_mnemonic_code)
-        seed_b = hd_wallet.generateSeedFromStr(g_mnemonic_code, "mnemonic" + my_salt)
-        privkey_i, pubkey_b = hd_wallet.generatePrivkeyPubkeyPair(access_key, seed_b, True)
-        privkey_wif = pubkey_address.privkeyHex2Wif(privkey_i, True, True)
-        pubkey_s = bytes.decode(binascii.hexlify(pubkey_b))
-        address_s = pubkey_address.pubkey2address(pubkey_b, nettype = g_nettype, is_segwit = False)
-        h_b = pubkey_address.address2hash(address_s)
-        h_s = bytes.decode(binascii.hexlify(h_b))
-        #print('hash160 of address = %s' % h_s)
-        #return privkey_wif, pubkey_s, h_s, address_s
-        return {address_s: {'Public Key': pubkey_s, 'Private Key': privkey_wif, 'Hash 160': h_s}}
 
 def swap_endian_bytes(in_b: bytes):
         out_b = in_b[::-1]
@@ -217,16 +205,18 @@ def get_funding_address_keys_p2sh_p2wsh():
 
 def get_funding_address_keys_p2pkh():
         global g_source_info
-        keymap_list = []
-        access_key_list = [src['Access Key'] for src in g_source_info['P2PKH'] if 'Access Key' in src]
-        for access_key in access_key_list:
+        source_key_list = g_source_info['P2PKH']
+        for source_key in source_key_list:
                 keymap = {}
-                keymap['privkey'], keymap['pubkey'], keymap['hash160'], keymap['address']  = get_p2pkh_address(access_key)
-                print('privkey = %s, pubkey = %s, hash160 = %s, address = %s' % (keymap['privkey'], keymap['pubkey'], keymap['hash160'], keymap['address']))
-                keymap_list.append(keymap)
+                nettype, prefix, privkey_s, for_compressed_pubkey = bitcoin_base58.decodeWifPrivkey(privkey_wif)
+                #privkey_i = int(bytes.decode(privkey_s, 16))
+                pubkey_b = privkey2pubkey(privkey_i, for_compressed_pubkey)
+                hash160_b = hash_utils.hash160(pubkey)
+                address_s = pkh2address(hash160_b, nettype)
+                keymap[address_s] = {'Public Key': pubkey_b, 'Private Key': privkey_wif, 'Hash 160': hash160_b}
 
-        print('YYYYYYYYYYYYYYYYYYY keymap_list = %s' % keymap_list)
-        return keymap_list
+        print('keymap = %s' % keymap)
+        return keymap
 
 def get_funding_address_keys_p2wpkh():
         global g_source_info
@@ -362,16 +352,16 @@ def prepare_txn_inputs_p2sh(utxo_list: list, preimage_list: list, address_privke
                 in_txn += swap_endian_bytes(binascii.unhexlify(utxo['txn_id'])) + binascii.unhexlify('%08x' % utxo['out_index'])[::-1] + scriptsig_size_b + scriptsig_b + sequence
         return in_txn
 
-def prepare_txn_inputs_p2pkh(utxo_list: list, preimage_list: list, address_privkey_map: dict, address_pubkey_map: dict):
+def prepare_txn_inputs_p2pkh(utxo_list: list, preimage_list: list, address_map: dict):
         global g_locktime
         input_count = len(utxo_list)
         in_txn = bytes([input_count])
         sequence = None
         for utxo, preimage in zip(utxo_list, preimage_list):
-                sig_b = sign_txn_input(preimage, address_privkey_map[utxo['address']])
+                sig_b = sign_txn_input(preimage, address_map[utxo['address']]['Private Key'])
                 sig_size_b = bytes([len(sig_b)])
                 scriptsig_b = sig_size_b + sig_b
-                pubkey_b = binascii.unhexlify(address_pubkey_map[utxo['address']])
+                pubkey_b = binascii.unhexlify(address_map[utxo['address']]['Public Key'])
                 pubkey_size_b = bytes([len(pubkey_b)])
                 scriptsig_b += pubkey_size_b + pubkey_b
                 scriptsig_size_b = bytes([len(scriptsig_b)])
@@ -463,11 +453,14 @@ def prepare_txn_outs(utxo_list: list, req_amount: float):
 
         out_txn = bytes([out_count])
         for target in g_target_info:
-                amount_b = btc2bytes(target['Amount'])
-                address = target['Address']
-                script_b = get_default_locking_script(address)
-                script_size_b = bytes([len(script_b)])
-                out_txn += amount_b + script_size_b + script_b
+                if 'Address' in target:
+                        amount_b = btc2bytes(target['Amount'])
+                        address = target['Address']
+                        script_b = get_default_locking_script(address)
+                        script_size_b = bytes([len(script_b)])
+                        out_txn += amount_b + script_size_b + script_b
+                 else:
+                        get_address_amount_map(target['Amount'])
         change_b = btc2bytes(change_btc)
         change_witness_program_b, change_address = get_change_address_hash()
         size_change_witness_program_b = bytes([len(change_witness_program_b)])
@@ -821,19 +814,53 @@ def prepare_signed_txn_p2sh_p2wpkh():
         signed_txn = version + marker + segwit_flag + txn_inputs + txn_outs + witness_b + locktime_b
         return signed_txn
 
+#def prepare_signed_txn_p2pkh():
+#        global g_locktime
+#        req_amount = get_required_amount()
+#        version = binascii.unhexlify('%08x' % 0x02)[::-1]
+#        #marker = b'\x00'
+#        #segwit_flag = b'\x01'
+#        keymap_list = get_funding_address_keys_p2pkh()
+#        address_map = get_p2pkh_address_map('m/0')
+#        address_list = [keymap['address'] for keymap in keymap_list]
+#        utxo_list = get_utxos_for_address(address_list, req_amount)
+#        address_privkey_map = dict(iter([(keymap['address'], keymap['privkey']) for keymap in keymap_list]))
+#        address_pubkey_map = dict(iter([(keymap['address'], keymap['pubkey']) for keymap in keymap_list]))
+#        preimage_list = get_preimage_list_p2pkh(utxo_list)
+#        txn_inputs = prepare_txn_inputs_p2pkh(utxo_list, preimage_list, address_privkey_map, address_pubkey_map)
+#        txn_outs = prepare_txn_outs(utxo_list, req_amount)
+#        locktime_b = locktime2bytes(g_locktime)
+#        print('locktime_b = %s' % bytes.decode(binascii.hexlify(locktime_b)))
+#        print('preimage_list = %s' % [bytes.decode(binascii.hexlify(preimage)) for preimage in preimage_list])
+#        #signed_txn = version + marker + segwit_flag + txn_inputs + txn_outs + witness_b + locktime_b
+#        signed_txn = version + txn_inputs + txn_outs + locktime_b
+#        return signed_txn
+
+def get_in_use_access_keys(txn_type: str):
+        if txn_type in ['p2sh', 'p2sh-p2wsh', 'p2sh-p2wpkh']:
+                access_key_list = g_in_use_access_keys['p2sh']
+        else:
+                access_key_list = g_in_use_access_keys[txn_type]
+        return access_keys
+
+def update_used_access_keys(access_keys):
+        g_used_access_keys.extend(access_keys)
+
+def get_dest_access_keys(amount: float):
+        
+
 def prepare_signed_txn_p2pkh():
         global g_locktime
         req_amount = get_required_amount()
         version = binascii.unhexlify('%08x' % 0x02)[::-1]
         #marker = b'\x00'
         #segwit_flag = b'\x01'
-        keymap_list = get_funding_address_keys_p2pkh()
-        address_list = [keymap['address'] for keymap in keymap_list]
+        address_map = get_funding_address_keys_p2pkh()
+        address_map.update(get_p2pkh_address_map('m/0'))
+        address_list = list(address_map.keys())
         utxo_list = get_utxos_for_address(address_list, req_amount)
-        address_privkey_map = dict(iter([(keymap['address'], keymap['privkey']) for keymap in keymap_list]))
-        address_pubkey_map = dict(iter([(keymap['address'], keymap['pubkey']) for keymap in keymap_list]))
         preimage_list = get_preimage_list_p2pkh(utxo_list)
-        txn_inputs = prepare_txn_inputs_p2pkh(utxo_list, preimage_list, address_privkey_map, address_pubkey_map)
+        txn_inputs = prepare_txn_inputs_p2pkh(utxo_list, preimage_list, address_map)
         txn_outs = prepare_txn_outs(utxo_list, req_amount)
         locktime_b = locktime2bytes(g_locktime)
         print('locktime_b = %s' % bytes.decode(binascii.hexlify(locktime_b)))
@@ -878,26 +905,120 @@ def prepare_signed_txn_p2wsh():
         signed_txn = version + marker + segwit_flag + txn_inputs + txn_outs + witness_b + locktime_b
         return signed_txn
 
-def get_address_redeem_script_map():
+def get_privkey_pubkey_pair_from_access_key(access_key: str):
         pass
 
-def get_address_pubkey_map():
-        pass
+def get_p2pkh_address_map(access_key: str):
+        global g_nettype, g_mnemonic_code
+        print('mnemonic code = %s' % g_mnemonic_code)
+        seed_b = hd_wallet.generateSeedFromStr(g_mnemonic_code[0], "mnemonic" + my_salt)
+        privkey_i, pubkey_b = hd_wallet.generatePrivkeyPubkeyPair(access_key, seed_b, True)
+        privkey_wif = pubkey_address.privkeyHex2Wif(privkey_i, True, True)
+        address_s = pubkey_address.pubkey2address(pubkey_b, nettype = g_nettype, is_segwit = False)
+        h_b = pubkey_address.address2hash(address_s)
+        return {address_s: {'Public Key': pubkey_b, 'Private Key': privkey_wif, 'Hash 160': h_b}}
 
-def get_address_privkeys_map():
-        pass
+def get_p2wpkh_address_map(access_key: str):
+        global g_nettype, g_mnemonic_code
+        print('mnemonic code = %s' % g_mnemonic_code)
+        seed_b = hd_wallet.generateSeedFromStr(g_mnemonic_code[0], "mnemonic" + my_salt)
+        privkey_i, pubkey_b = hd_wallet.generatePrivkeyPubkeyPair(access_key, seed_b, True)
+        privkey_wif = pubkey_address.privkeyHex2Wif(privkey_i, g_nettype, True)
+        address_s = pubkey_address.pubkey2segwitaddr(pubkey_b, g_nettype)
+        hash160_b = pubkey_address.address2hash(address_s)
+        return {address_s: {'Public Key': pubkey_b, 'Private Key': privkey_wif, 'Hash 160': hash160_b}}
 
-def get_address_unlock_key_threshold_map():
-        pass
+WITNESS_V0_KEYHASH_SIZE=0x14
+WITNESS_V0_SCRIPTHASH_SIZE=0x20
 
-supported_scripts = ['P2PKH', 'P2SH-Multisig', 'P2WPKH', 'P2WSH-Multisig', 'P2SH-P2WPKH', 'P2SH-P2WSH-Multisig']
+def get_witness_redeem_script(version: int, size: int, hash160_b: bytes):
+        version_b = bytes([version])
+        size_b = bytes([size])
+        return version_b + size_b + hash160_b
+
+def get_p2sh_p2wpkh_address_map(access_key: str):
+        global g_nettype, g_mnemonic_code
+        print('mnemonic code = %s' % g_mnemonic_code)
+        seed_b = hd_wallet.generateSeedFromStr(g_mnemonic_code[0], "mnemonic" + my_salt)
+        privkey_i, pubkey_b = hd_wallet.generatePrivkeyPubkeyPair(access_key, seed_b, True)
+        privkey_wif = pubkey_address.privkeyHex2Wif(privkey_i, g_nettype, True)
+        address_s = pubkey_address.pubkey2segwitaddr(pubkey_b, g_nettype)
+        hash160_b = pubkey_address.address2hash(address_s)
+        redeem_script_b = get_witness_redeem_script(0, WITNESS_V0_KEYHASH_SIZE, hash160_b)
+        address_s = pubkey_address.redeemScript2address(redeem_script_b, g_nettype)
+        script_hash160_b = hash_utils.hash160(redeem_script_b)
+        return {address_s: {'Public Key': pubkey_b, 'Private Key': privkey_wif, 'Hash 160': hash160_b, 'Redeem Script': redeem_script_b, 'Script Hash 160': script_hash160_b}}
+
+def get_p2sh_multisig_address_map(access_key: str, unlock_key_count):
+        global g_nettype, g_mnemonic_code
+        print('mnemonic code = %s' % g_mnemonic_code)
+        pubkey_list = []
+        privkey_list = []
+        index = 0
+        address_map = {}
+        for mnemonic_code in g_mnemonic_code:
+                seed_b = hd_wallet.generateSeedFromStr(mnemonic_code, "mnemonic" + my_salt)
+                privkey_i, pubkey_b = hd_wallet.generatePrivkeyPubkeyPair(access_key, seed_b, True)
+                privkey_wif = pubkey_address.privkeyHex2Wif(privkey_i, True, True)
+                if index < unlock_key_count:
+                        privkey_list.append(privkey_wif)
+                pubkey_s = bytes.decode(binascii.hexlify(pubkey_b))
+                pubkey_list.append(pubkey_s)
+        redeem_script_b = get_redeem_script_from_pubkey_list(pubkey_list, unlock_key_count)
+        script_hash160_b = hash_utils.hash160(redeem_script_b)
+        address_s = pubkey_address.redeemScript2address(redeem_script_b, g_nettype)
+        address_map[address_s] = {'Private Keys': privkey_list, 'Redeem Script': redeem_script_b, 'Public Keys': pubkey_list, 'Script Hash 160': script_hash160_b}
+        return address_map
+
+def get_p2wsh_multisig_address_map(access_key: str, unlock_key_count):
+        global g_nettype, g_mnemonic_code
+        print('mnemonic code = %s' % g_mnemonic_code)
+        pubkey_list = []
+        privkey_list = []
+        index = 0
+        address_map = {}
+        for mnemonic_code in g_mnemonic_code:
+                seed_b = hd_wallet.generateSeedFromStr(mnemonic_code, "mnemonic" + my_salt)
+                privkey_i, pubkey_b = hd_wallet.generatePrivkeyPubkeyPair(access_key, seed_b, True)
+                privkey_wif = pubkey_address.privkeyHex2Wif(privkey_i, True, True)
+                if index < unlock_key_count:
+                        privkey_list.append(privkey_wif)
+                pubkey_s = bytes.decode(binascii.hexlify(pubkey_b))
+                pubkey_list.append(pubkey_s)
+        redeem_script_b = get_redeem_script_from_pubkey_list(pubkey_list, unlock_key_count)
+        sha256_b = hash_utils.sha256(redeem_script_b)
+        address_s = pubkey_address.hash2segwitaddr(sha256_b, g_nettype)
+        address_map[address_s] = {'Private Keys': privkey_list, 'Redeem Script': redeem_script_b, 'Public Keys': pubkey_list, 'Script SHA 256': sha256_b}
+        return address_map
+
+def get_p2sh_p2wsh_multisig_address_map(access_key: str, unlock_key_count):
+        global g_nettype, g_mnemonic_code
+        print('mnemonic code = %s' % g_mnemonic_code)
+        pubkey_list = []
+        privkey_list = []
+        index = 0
+        address_map = {}
+        for mnemonic_code in g_mnemonic_code:
+                seed_b = hd_wallet.generateSeedFromStr(mnemonic_code, "mnemonic" + my_salt)
+                privkey_i, pubkey_b = hd_wallet.generatePrivkeyPubkeyPair(access_key, seed_b, True)
+                privkey_wif = pubkey_address.privkeyHex2Wif(privkey_i, True, True)
+                if index < unlock_key_count:
+                        privkey_list.append(privkey_wif)
+                pubkey_s = bytes.decode(binascii.hexlify(pubkey_b))
+                pubkey_list.append(pubkey_s)
+        redeem_script_b = get_redeem_script_from_pubkey_list(pubkey_list, unlock_key_count)
+        sha256_b = hash_utils.sha256(redeem_script_b)
+        address_s = pubkey_address.redeemScript2address(redeem_script_b, g_nettype)
+        address_s = pubkey_address.hash2segwitaddr(sha256_b, g_nettype)
+        address_map[address_s] = {'Private Keys': privkey_list, 'Redeem Script': redeem_script_b, 'Public Keys': pubkey_list, 'Script SHA 256': sha256_b}
+        return address_map
 
 def get_address_key_map_p2pkh(src_info_list: list):
         address_map = {}
         for src_info in src_info_list:
                 if 'Access Key' in src_info:
                         # {address_s: {'Public Key': pubkey_s, 'Private Key': privkey_wif, 'Hash 160': h_s}}
-                        get_p2pkh_address(src_info['Access Key']))
+                        address_map.update(get_p2pkh_address_map(src_info['Access Key']))
                         continue
                 if 'Address' in src_info:
                         address_map[src_info['Address']] = {'Private Key': src_info['Private Key']}
@@ -906,13 +1027,15 @@ def get_address_key_map_p2pkh(src_info_list: list):
 
 def get_address_key_map_p2sh_multisig(src_info_list: list):
         address_map = {}
-        for src_info in src_info_list: list):
+        for src_info in src_info_list:
                 if 'Access Key' in src_info:
                         address_map.update(get_p2sh_address_from_access_keys(src_info['Access Key'], src_info['Unlock Key Threshold']))
                         continue
                 if 'Public Keys' in src_info:
                         address_map.update(get_p2sh_address_from_public_keys(src_info['Public Keys'], src_info['Private Keys']))
                         continue
+
+supported_scripts = ['P2PKH', 'P2SH-Multisig', 'P2WPKH', 'P2WSH-Multisig', 'P2SH-P2WPKH', 'P2SH-P2WSH-Multisig']
 
 def get_address_key_map():
         address_map = {}
@@ -1004,65 +1127,14 @@ def process_transaction():
         pass
 
 if __name__ == '__main__':
-        #privkey, pubkey, h160, address = get_p2wpkh_address()
-        #print('privkey = %s, pubkey = %s, hash160 = %s, address = %s' % (privkey, pubkey, h160, address))
-        #utxos = get_utxos_for_address(address, amount = 125)
-        #print('utxos = %s' % utxos)
-        #prepare_raw_txn()
-        #get_default_locking_script('1F1tAaz5x1HUXrCNLbtMDqcw6o5GNn4xqX')
-        #get_default_locking_script('bc1qq3q342clxm2p04hfdknhe3cg6mrs8ur8jfln7h')
-        #sign_txn_input()
-#        signed_txn = prepare_signed_txn_p2wpkh()
-#        print('signed_txn = %s' % bytes.decode(binascii.hexlify(signed_txn)))
-
-#        signed_txn = prepare_signed_txn_p2sh_p2wpkh()
-#        print('signed_txn = %s' % bytes.decode(binascii.hexlify(signed_txn)))
-
-#        signed_txn = prepare_signed_txn_p2pkh()
-#        print('signed_txn = %s' % bytes.decode(binascii.hexlify(signed_txn)))
-
-#        signed_txn = prepare_signed_txn_p2sh()
-#        print('signed_txn = %s' % bytes.decode(binascii.hexlify(signed_txn)))
-
-#        signed_txn = prepare_signed_txn_p2wsh()
-#        print('signed_txn = %s' % bytes.decode(binascii.hexlify(signed_txn)))
-
-        signed_txn = prepare_signed_txn_p2sh_p2wsh()
-        print('signed_txn = %s' % bytes.decode(binascii.hexlify(signed_txn)))
-
-#        privkey = '619c335025c7f4012e556c2a58b2506e30b8511b53ade95ea316fd8c3286feb9'.zfill(64)
-#        txhash = 'c37af31116d1b27caf68aae9e3ac82f1477929014d5b917657d0eb49478cb670'.zfill(64)
-#        signingkey = ecdsa.SigningKey.from_string(binascii.unhexlify(privkey), curve=ecdsa.SECP256k1)
-#        sig_b = signingkey.sign_digest(binascii.unhexlify(txhash), sigencode=ecdsa.util.sigencode_der_canonize) + b'\x01'
-#        print('sig = %s' % bytes.decode(binascii.hexlify(sig_b)))
-        #vk = ecdsa.VerifyingKey.from_string(pubkey_b, curve=ecdsa.SECP256k1)
-
-        print('amount 6 => in bytes = %s' % bytes.decode(binascii.hexlify(btc2bytes(6))))
-
-#        keymaplist_list = get_funding_address_keys_p2sh_p2wsh()
-#        address_list  = [get_p2sh_p2wsh_address_from_pubkey_list([keymap['pubkey'] for keymap in keymaplist['Keymap List']], keymaplist['Unlock Key Threshold']) for keymaplist in keymaplist_list]
-#        print('P2Sh-P2WSH address = %s' % address_list)
-#        privkey_wif, pubkey_s1, h_s, address_s = get_p2pkh_address('m/7')
-#        print('privkey_wif = %s, pubkey_s = %s, h_s = %s, address_s = %s' % (privkey_wif, pubkey_s1, h_s, address_s))
-#        privkey_wif, pubkey_s2, h_s, address_s = get_p2pkh_address('m/8')
-#        print('privkey_wif = %s, pubkey_s = %s, h_s = %s, address_s = %s' % (privkey_wif, pubkey_s2, h_s, address_s))
-#        privkey_wif, pubkey_s3, h_s, address_s = get_p2pkh_address('m/9')
-#        print('privkey_wif = %s, pubkey_s = %s, h_s = %s, address_s = %s' % (privkey_wif, pubkey_s3, h_s, address_s))
-#        address = get_p2wsh_address_from_pubkey_list([pubkey_s1, pubkey_s2, pubkey_s3], 2)
-#        print('P2WSH address = %s' % address)
-#        privkey_wif, pubkey_s1, h_s, address_s = get_p2pkh_address('m/7')
-#        print('privkey_wif = %s, pubkey_s = %s, h_s = %s, address_s = %s' % (privkey_wif, pubkey_s1, h_s, address_s))
-#        privkey_wif, pubkey_s2, h_s, address_s = get_p2pkh_address('m/8')
-#        print('privkey_wif = %s, pubkey_s = %s, h_s = %s, address_s = %s' % (privkey_wif, pubkey_s2, h_s, address_s))
-#        privkey_wif, pubkey_s3, h_s, address_s = get_p2pkh_address('m/9')
-#        print('privkey_wif = %s, pubkey_s = %s, h_s = %s, address_s = %s' % (privkey_wif, pubkey_s3, h_s, address_s))
-#        address = get_p2sh_address_from_pubkey_list([pubkey_s1, pubkey_s2, pubkey_s3], 2)
-#        print('P2SH address = %s' % address)
-#        privkey_wif, pubkey_s, h_s, address_s = get_p2pkh_address('m/0')
-#        print('privkey_wif = %s, pubkey_s = %s, h_s = %s, address_s = %s' % (privkey_wif, pubkey_s, h_s, address_s))
-#        privkey_wif, pubkey_s, h_s, address_s = get_p2sh_p2wpkh_address('m/10')
-#        print('privkey_wif = %s, pubkey_s = %s, h_s = %s, address_s = %s' % (privkey_wif, pubkey_s, h_s, address_s))
-#        privkey_wif, pubkey_s, h_s, address_s = get_p2pkh_address('m/30')
-#        print('privkey_wif = %s, pubkey_s = %s, h_s = %s, address_s = %s' % (privkey_wif, pubkey_s, h_s, address_s))
-#        privkey_wif, pubkey_s, h_s, address_s = get_p2pkh_address('m/1')
-#        print('privkey_wif = %s, pubkey_s = %s, h_s = %s, address_s = %s' % (privkey_wif, pubkey_s, h_s, address_s))
+        address_map = get_p2pkh_address_map('m/0')
+        print('P2PKH address_map = %s' % address_map)
+#        prepare_signed_txn_p2pkh()
+#        address_map = get_p2wpkh_address_map('m/0')
+#        print('P2WPKH address map = %s' % address_map)
+#        address_map = get_p2sh_multisig_address_map('m/0', 2)
+#        print('P2SH Multisig: address map = %s, redeem_script = %s' % (address_map, [bytes.decode(binascii.hexlify(v['Redeem Script'])) for k, v in address_map.items()]))
+#        address_map = get_p2wsh_multisig_address_map('m/0', 2)
+#        print('P2WSH Multisig: address map = %s, redeem_script = %s' % (address_map, [bytes.decode(binascii.hexlify(v['Redeem Script'])) for k, v in address_map.items()]))
+#        address_map = get_p2sh_p2wpkh_address_map('m/0')
+#        address_map = get_p2sh_p2wsh_multisig_address_map('m/0', 2)

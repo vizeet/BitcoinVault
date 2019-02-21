@@ -111,7 +111,7 @@ def verifyMnemonicWordCodeString(mnemonic_code: str):
         return verifyChecksumInSelectorBits(entropy_check_i, mnemonic_length)
 
 if __name__ == '__main__':
-        word_key_list = getMnemonicWordCodeString(15)
+        word_key_list = getMnemonicWordCodeString(24)
 
         print('mnemonic key list = %s' % word_key_list)
 

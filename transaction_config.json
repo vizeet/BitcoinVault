@@ -1,0 +1,68 @@
+{
+        "Mnemonic Codes": [[
+                "maple", "tomato", "smoke", "label", "rotate", "alien", "frown",
+                "dry", "slim", "marriage", "wool", "hotel", "model", "shop",
+                "era", "expose", "shift", "afraid", "cradle", "junior", "any",
+                "object", "fat", "addict"
+        ], [
+                "history", "side", "boost", "enrich", "slide", "refuse", "fury",
+                "equip", "chronic", "bird", "warfare", "knock", "skull", "shallow",
+                "hurdle", "dish", "sleep", "fruit", "unveil", "economy", "earn",
+                "news", "shallow", "spirit"
+        ], [
+                "olympic", "oak", "average", "cash", "neglect", "shaft", "siren",
+                "hub", "sustain", "today", "noodle", "midnight", "kidney", "tongue",
+                "west", "learn", "someone", "endorse", "goose", "assist", "book",
+                "bracket", "glue", "use"
+        ]],
+        "Source Info": {
+                "P2PKH": [{
+                        "Address": "mkYqHGzQvoZ2AkGWBwA5BroC6j6c21xAAF",
+                        "Private Key": "cUcSmC5p2Sr4mVNH2qcAS4YZqVk6tcxzwwvPVDNVfPVPGAsva53Q"
+                }],
+                "P2WPKH": [{
+                        "Address": "bcrt1qxueekwvyeq30n7ye7wjpv44pwy8xath8xhk0r7",
+                        "Private Key": "cUcSmC5p2Sr4mVNH2qcAS4YZqVk6tcxzwwvPVDNVfPVPGAsva53Q"
+                }],
+                "P2SH-P2WPKH": [{
+                        "Address": "2MzgXokD96NNM3DL2fpwAuMwtaSjMKk1aeM",
+                        "Private Key": "cUcSmC5p2Sr4mVNH2qcAS4YZqVk6tcxzwwvPVDNVfPVPGAsva53Q"
+                }],
+                "P2SH": [{
+                        "Address": "2NAKZzakZdNJg1cWcRLEZZs9wro7VHGz1Aw",
+                        "Redeem Script": "OP_2 0360a69fa2e2f8f0c7701c9053fab596dbb465b0b6fa02c67480f77a3d545e26d8 0397f58639a506e6dd6640dbc492b3a0d8c445183007ec0c015fcae6920bfe6c75 02493fd8ec3cb612892c0c8cfe393177e915553c68f8a9b38628e9b568d777b741 OP_3 OP_CHECKMULTISIG",
+                        "Private Keys": ["cUcSmC5p2Sr4mVNH2qcAS4YZqVk6tcxzwwvPVDNVfPVPGAsva53Q", "cSKwEoR9GRpdVnrg27D5k3FWjWf8mrhR8TdxPpWf5XvUhgzZ9J6c"]
+                }],
+                "P2WSH": [{
+                        "Address": "bcrt1qk0np4fac05kwjmsvutr6yxpl3e7v9fhpj39hq5ccw708yffkucdqvpdxmv",
+                        "Redeem Script": "OP_2 0360a69fa2e2f8f0c7701c9053fab596dbb465b0b6fa02c67480f77a3d545e26d8 0397f58639a506e6dd6640dbc492b3a0d8c445183007ec0c015fcae6920bfe6c75 02493fd8ec3cb612892c0c8cfe393177e915553c68f8a9b38628e9b568d777b741 OP_3 OP_CHECKMULTISIG",
+                        "Private Keys": ["cUcSmC5p2Sr4mVNH2qcAS4YZqVk6tcxzwwvPVDNVfPVPGAsva53Q", "cSKwEoR9GRpdVnrg27D5k3FWjWf8mrhR8TdxPpWf5XvUhgzZ9J6c"]
+                }],
+                "P2SH-P2WSH": [{
+                        "Public Keys": ["030adfebb488c3a6d12a36520f365b5ac1ff8b537dfb0c34e30c74d3196e23c9ae", "022788cb6338fb2e758e34887b6b5e3dc41c1460b42fd805258baca410a6c355ba", "02ce10549919b54bef22b464aee3fa69d6f97d0842706978d2155f7487c4d5f848"],
+                        "Private Keys": ["bcrt1q0xkegv9rx84d629tnnj0zc6gt37thnwhwxdh5k", "bcrt1q7dpxnkfy4qfztmdw89t2g6ums64zevly6gmv9x"]
+                }]
+        },
+        "In-use Access Keys": {
+                "P2WPKH": [],
+                "P2WSH": [],
+                "P2PKH": [],
+                "P2SH": []
+        },
+        "Used Access Keys": {
+                "P2WPKH": [],
+                "P2WSH": [],
+                "P2PKH": [],
+                "P2SH": []
+        },
+        "Target Info": [{
+                "Address": "bcrt1q5clqxgfv58s30h8qv2fw7v3cqqu3umax6lhdhs",
+                "Amount": 150.0
+        }, {
+                "Amount": 90.0
+        }],
+        "Transaction Fees": 0.002,
+        "Locktime": 0,
+        "Network Type": "regtest",
+        "Address Amount Limit": 20
+}
